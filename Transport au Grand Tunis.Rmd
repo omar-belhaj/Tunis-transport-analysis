@@ -1,0 +1,259 @@
+---
+title: "Etude sur le transport dans le Grand Tunis"
+author: "BELHAJ Omar et ROBBANA Amenallah"
+date: "2025-12-07"
+output:
+  pdf_document: default
+  html_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  warning = FALSE,
+  message = FALSE
+)
+```
+
+### Introduction et problématique
+
+Ce travail porte sur l’usage et la perception du transport public dans le Grand Tunis. Une enquête via questionnaire a été menée afin d’analyser les habitudes de déplacement, la fréquence d’utilisation, les modes privilégiés et le niveau de satisfaction concernant le confort, la sécurité, l’accessibilité et le coût.
+
+Bien que central dans la mobilité urbaine, le transport public à Tunis reste souvent jugé insuffisant ou peu fiable. La problématique principale est donc : quels facteurs encouragent ou freinent son utilisation, et comment les usagers en évaluent-ils la qualité ?
+
+L’analyse des données collectées entre octobre et décembre 2025 vise à identifier les éléments déterminants de l’usage des transports en commun et à mettre en évidence les principales difficultés rencontrées.
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(readr)
+library(FactoMineR)
+library(factoextra)
+library(datasets)
+library(corrplot)
+```
+
+Après avoir téléchargé nos données sous format CSV depuis Google Forms, nous devons les charger :
+
+```{r}
+data <- read.csv("transport.csv")
+```
+
+La base de données obtenue est une base de 77 lignes et 38 colonnes. \newpage
+
+### Statistique descriptive
+
+Présentation de la population ayant répondu à l'enquête :
+
+```{r}
+age <- table(data$Âge)
+pie(age,
+    labels = paste(names(age), "\n", age, " (", 
+                   round(100 * age / sum(age), 1), "%)", sep = ""),
+    main = "Répartition des répondants par tranche d'âge")
+```
+
+**Interprétation :** La majorité des répondants (72.7%) sont jeunes adultes âgés de 18 à 35 ans, ce qui indique que l’enquête reflète principalement le point de vue des utilisateurs les plus actifs des transports publics. Les tranches d’âge moins représentées (\<18 ans et \>60 ans) suggèrent que les opinions des adolescents et des seniors sont sous-représentées dans cette étude.
+
+```{r}
+csp <- table(data$Profession)
+pie(csp,
+    labels = paste(names(csp), "\n", csp, " (", 
+                   round(100 * csp / sum(csp), 1), "%)", sep = ""),
+    main = "Répartition des répondants par profession")
+
+```
+
+**Interprétation :** La population interrogée est majoritairement composée d’étudiants (72,7%), ce qui reflète un biais vers un public jeune et en formation. Les autres catégories professionnelles (cadres, professions libérales, retraités et chômeurs) sont beaucoup moins représentées, ce qui signifie que les perspectives des actifs et des seniors sont relativement peu prises en compte dans l’enquête.
+
+```{r}
+vehicule <- table(data$Avez.vous.un.véhicule.personnel..)
+pie(vehicule,
+    labels = paste(names(vehicule), "\n", vehicule, " (", 
+                   round(100 * vehicule / sum(vehicule), 1), "%)", sep = ""),
+    main = "Avez-vous un véhicule personnel ?")
+```
+
+**Interprétation** : La grande majorité des répondants (72,7%) ne possède pas de véhicule personnel, ce qui suggère une forte dépendance au transport public dans l’échantillon. Seuls 27,3% disposent d’un véhicule, ce qui pourrait influencer leur fréquence d’utilisation et leur perception des transports en commun.
+
+**Traitement des données :**
+
+Nous avons simplifié les noms des colonnes en renommant les questions générales, les questions à échelle de Likert et les questions de type Oui/Non par des noms plus courts et explicites.
+
+```{r}
+colnames(data) <- c(
+  "horodateur","age","sexe","gouvernorat","profession","vehicule_perso",
+  
+  "freq_plusieurs_fois","heures_pointe","travail_etudes","routine_hebdo","freq_metro_bus_train","combine_modes",
+  "privilegie_tp","planification","stations_proches","correspondances_faciles","horaires_adaptes","desserte_zones",
+  "adapte_trajets",
+  
+  "état_vehicules","confort","propreté","ponctualité","securité","conduite_prudente",
+  "risque_vol","risque_pannes","fiabilité","coût","recommandation","accessibilite_pmr","satisfaction_globale",
+  
+  "abonnement","victime_vol_harcelement","renonce_deplacement","avantages_employeur","app_transport","transporte_passagers"
+)
+```
+
+\newpage
+
+### Analyse en composantes principales
+
+```{r}
+variables <- c("état_vehicules","confort","propreté","ponctualité","securité","conduite_prudente",
+  "risque_vol","risque_pannes","fiabilité","coût","recommandation","accessibilite_pmr","satisfaction_globale")
+# matrice de corrélation
+matrice_corr <- cor(data[, variables], use = "complete.obs")
+# corrélogramme
+corrplot(matrice_corr, method = "circle", type = "upper", tl.col = "black")
+```
+
+**Interprétation** : La matrice de corrélation suggère que “état_vehicules”, “confort”, “propreté”, “ponctualité”, “coût”, “recommandation”, “accessibilité PMR” et “satisfaction globale” sont des variables étroitement liées, tandis que “sécurité”, “conduite prudente” et “risque_vol” forment un groupe distinct centré sur la sécurité.
+
+```{r}
+X <- data[, variables]
+res.pca=PCA(X,ncp = 4,graph= F)
+head(res.pca$eig)
+```
+
+**Interprétation** : Les deux premières composantes principales expliquent environ 66% de la variance totale des données, tandis que les trois premières composantes expliquent environ 73% de la variance totale.
+
+```{r}
+fviz_eig(res.pca, addlabels = TRUE)
+```
+
+**Choix du nombre d'axes** : Selon le critère de Kaiser, on retiendrait les composantes principales dont la valeur propre est supérieure à 1, ce qui signifie que la première et la deuxième composante principale seraient retenues. Selon le critère du taux d’inertie cumulée, on pourrait retenir deux à trois composantes principales qui expliquent 66% à 73% de l’inertie totale. Selon le critère du coude, on peut voir que le coude se situe après la deuxième composante principale, ce qui indique que l’on peut se contenter de retenir les deux premières composantes principales. Nous pourrions donc retenir les deux premières composantes principales qui expliquent environ 66% de l’inertie totale.
+
+```{r}
+res.pca$var$coord
+```
+
+```{r warning=FALSE}
+fviz_pca_var(res.pca,shadow=TRUE)
+```
+
+**Interprétation** : Les variables les plus fortement corrélées avec le premier axe sont état_vehicules (0.86), propreté (0.84), confort (0.80), ponctualité (0.77), coût (0.75), satisfaction_globale (0.84), recommandation (0.87), accessibilite_pmr (0.84). Cela indique que cet axe représente globalement la *perception de la qualité du transport public*, combinant confort, propreté, ponctualité, état des véhicules et satisfaction générale. La variable risque_pannes est fortement correlée négativement à cet axe (-0.72).
+
+Les variables les plus corrélées sont avec le deuxième axe sont sécurité (0.87), conduite_prudente (0.71), risque_vol (-0.86). Cet axe semble représenter la *perception du risque et de la sécurité dans le transport public* : une sécurité perçue élevée et un faible risque de vol positionnent un individu en haut de l’axe, tandis qu’un ressenti de risque élevé le positionne en bas.
+
+```{r}
+res.pca$var$cos2
+```
+
+```{r}
+fviz_pca_var(res.pca, col.var = "cos2")+
+ scale_color_gradient2(low="white" ,mid="blue" ,
+ high="red", midpoint = 0.6)+
+ theme_minimal()
+```
+
+**Interprétation :** Le cos² mesure la qualité de représentation des variables sur chaque axe : plus il est proche de 1, mieux la variable est représentée. Les variables fortement représentées sur le premier axe sont état_vehicules (0.74), propreté (0.71), confort (0.64), recommandation (0.76), accessibilite_pmr (0.70), satisfaction_globale (0.71). Cela confirme que Dim.1 synthétise la **qualité et la satisfaction globale du transport**.
+
+Les variables les mieux représentées sur le deuxième axe sont sécurité (0.76), risque_vol (0.74), conduite_prudente (0.50). Cela confirme que Dim.2 reflète la **perception de la sécurité et du risque**.
+
+```{r}
+fviz_pca_ind(res.pca,geom = "text",col.ind="cos2")+
+scale_color_gradient2(low="blue", mid="white",
+ high="red",  midpoint=0.5)
+```
+
+**Interprétation :** La carte des individus montre qu'une grande partie des répondants se concentre autour du centre du graphe avec un cos² faible, ce qui signifie que leur position n’est pas fortement expliquée par ces deux dimensions et que leur profil global est relativement proche de la moyenne. En revanche, les individus situés aux extrémités en haut, en bas à droite ou à gauche sont bien représentés, indiquant des profils nettement contrastés en termes de perception de la qualité et de la sécurité du transport.
+
+### Analyse des correspondances multiples
+
+```{r}
+vars_oui_non <- c(
+  "vehicule_perso",
+  "abonnement",
+  "victime_vol_harcelement",
+  "renonce_deplacement",
+  "avantages_employeur",
+  "app_transport",
+  "transporte_passagers"
+)
+
+# Conversion en facteur
+data[vars_oui_non] <- lapply(data[vars_oui_non], as.factor)
+acm <- MCA(data[vars_oui_non], graph = FALSE)
+```
+
+```{r}
+acm$eig
+```
+
+```{r}
+# Graphique des valeurs propres
+fviz_eig(acm, addlabels = TRUE)
+```
+
+**Choix du nombre d'axes :** Selon le critère de Kaiser, on retiendrait les axes dont la valeur propre est supérieure à la moyenne (1 / nombre de variables = 0.14), ce qui correspond ici aux trois premiers axes. Selon le critère du taux d’inertie cumulée, les deux premiers axes expliquent environ 44% de l’inertie totale, ce qui est satisfaisant pour une analyse de variables qualitatives. Selon le critère du coude, on peut voir que le coude se situe après la deuxième composante principale, ce qui indique que l’on peut se contenter de retenir les deux premières composantes principales.
+
+```{r}
+fviz_mca_var(acm,
+ col.var = "contrib", # Couleur en fonction de la contribution
+ gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"), # Choix de couleurs
+ repel = TRUE, # Évite le chevauchement des labels
+ ggtheme = theme_minimal() # Style du graphique
+ )
+
+```
+
+**Interprétation :** Le premier groupe de modalités regroupe vehicule_perso_oui, abonnement_non, transporte_passagers_oui, renonce_deplacement_non et app_transport_oui, caractérisant des individus qui utilisent leur véhicule personnel, transportent des passagers et utilisent des applications de transport tout en ne renonçant pas à leurs déplacements et sans abonnement de transport. Le second groupe, opposé sur le premier axe, réunit vehicule_perso_non, abonnement_oui, transporte_passagers_non, app_transport_non et avantages_employeur_non, correspondant à des individus qui n’utilisent pas de véhicule personnel, possèdent un abonnement, ne transportent pas de passagers et ne bénéficient pas d’avantages liés au transport. Le premier groupe regroupe des individus fortement dépendants de leur véhicule personnel mais utilisateurs d’applications, ce qui indique un profil autonome et mobile. Le second groupe regroupe des individus qui privilégient le transport en commun, n’ont pas de véhicule personnel, n'utilisent pas d’applications, et ne transportent pas de passagers, traduisant un profil plus dépendant des services collectifs et moins mobile.
+
+```{r}
+dimdesc(acm, axes=1:2, proba=0.05)$`Dim 1`
+```
+
+**Interprétation :** L’axe 1 de cette ACM semble refléter le *niveau d’utilisation des transports publics*. Les individus situés d’un côté de l’axe sont plutôt des non-utilisateurs, qui ne possèdent pas d’abonnement, ne transportent pas de passagers et ne bénéficient pas d’avantages liés à l’usage des transports publics. À l’inverse, ceux situés de l’autre côté sont des utilisateurs réguliers, abonnés, et qui utilisent activement les transports publics pour se déplacer ou pour transporter d’autres personnes, ce qui traduit un engagement plus élevé envers ce mode de transport.
+
+```{r}
+dimdesc(acm, axes=1:2, proba=0.05)$`Dim 2`
+```
+
+**Interprétation :** L’axe 2 de cette ACM semble représenter la *possession et l’accès aux avantages liés aux transports publics*. Les individus situés d’un côté de l’axe possèdent un véhicule personnel et bénéficient d’avantages liés à l’employeur, tandis que ceux situés de l’autre côté ne possèdent pas de véhicule personnel, n’ont pas d’avantages liés à l’employeur, et sont plus susceptibles de ne pas avoir d’abonnement ou de renoncer à certains déplacements. Cela traduit un contraste net entre les usagers dépendants du transport public et ceux qui disposent de moyens alternatifs ou d’avantages facilitant leurs
+
+```{r}
+fviz_mca_ind (acm,select.ind = list(cos2 = 0.4),
+ repel = TRUE,
+ ggtheme = theme_minimal())
+```
+
+**Interprétation :** Les individus situés à droite de l’axe 1 sont principalement des utilisateurs réguliers du transport public, abonnés aux services, et qui n’utilisent pas d’application pour leurs déplacements, tandis que ceux à gauche ont plutôt recours aux applications ou à d’autres solutions comme le covoiturage. Quant aux individus situés en haut de l’axe 2, ils possèdent un véhicule personnel et utilisent peu ou pas le transport en commun.
+
+### Classification automatique
+
+```{r}
+coords_acp <- res.pca$ind$coord
+coords_acp <- as.data.frame(coords_acp)
+res.HCPC <- HCPC(coords_acp, consol = TRUE, graph = FALSE)
+```
+
+```{r}
+plot.HCPC(res.HCPC, choice = "tree")
+```
+
+On choisit 4 clusters.
+
+**Arbre hiérarchique :**
+
+```{r}
+plot.HCPC(res.HCPC, choice = "map", draw.tree = FALSE)
+```
+
+**Description des classes par les variables :**
+
+```{r}
+res.HCPC$desc.var
+```
+
+**Interprétation des clusters :**
+
+*Cluster 1 (noir) :* Les individus présentent des valeurs significativement faibles sur Dim.1 (v-test = -5.48). Cela indique qu’ils perçoivent un niveau élevé de risques de pannes à bord des transports. Ils évaluent négativement la ponctualité et l’état des véhicules.
+
+*Cluster 2 (rouge) :* Ce cluster montre des valeurs proches de la moyenne sur Dim.1 et négatives sur Dim.2 (v-test = -2.24). Les individus ont une perception modérée des risques et se sentent moyennement en sécurité, avec une évaluation neutre de la ponctualité et de l’état des véhicules.
+
+*Cluster 3 (vert) :* Les individus ont des valeurs élevées positifs sur Dim.1 (v-test = 2.31) et Dim.2 (v-test = 6.87), ce qui indique qu’ils se sentent en sécurité, perçoivent peu de risques et estiment que les transports sont ponctuels et en bon état.
+
+*Cluster 4 (bleu) :* Ce cluster présente des valeurs élevées sur Dim.1 (v-test = 5.63) mais faibles sur Dim.2 (v-test = -3.09). Les individus semblent satisfaits de la qualité du transport, mais leur perception de la sécurité reste négative, traduisant un contraste entre le risque perçu et la qualité du service.
+
+**Conclusion :** L’étude met en évidence des profils contrastés d’usagers, opposant des individus bien intégrés au transport public à d’autres plus dépendants du véhicule personnel et plus sensibles aux problèmes de sécurité, soulignant l’importance des conditions de sécurité et des dispositifs d’accompagnement dans l’usage du transport public.
